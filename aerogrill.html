@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Симулятор аэрогриля</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 20px;
+    background: #edf2f7;
+    font-family: Arial, sans-serif;
+    color: #172b4d;
+}
+
+header {
+    background: #17365d;
+    color: white;
+    text-align: center;
+    padding: 20px;
+    border-radius: 10px;
+}
+
+header h1 {
+    margin: 0 0 8px;
+}
+
+.container {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 15px;
+    max-width: 1300px;
+    margin: 20px auto;
+}
+
+.panel {
+    background: white;
+    padding: 18px;
+    border-radius: 10px;
+    border: 1px solid #cbd5e1;
+    margin-bottom: 15px;
+}
+
+h3 {
+    color: #17365d;
+    margin-top: 0;
+}
+
+button {
+    width: 100%;
+    padding: 12px;
+    margin: 5px 0;
+    border: none;
+    border-radius: 6px;
+    background: #2563eb;
+    color: white;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+button:hover {
+    opacity: 0.85;
+}
+
+.secondary {
+    background: #475569;
+}
+
+.danger {
+    background: #b91c1c;
+}
+
+.success {
+    background: #15803d;
+}
+
+input {
+    width: 100%;
+    accent-color: #2563eb;
+}
+
+.value {
+    color: #1769aa;
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.card {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid #cbd5e1;
+}
+
+.card strong {
+    display: block;
+    margin-top: 10px;
+    font-size: 17px;
+}
+
+.indicator {
+    padding: 12px;
+    margin-top: 8px;
+    background: #f1f5f9;
+    border-radius: 6px;
+    font-weight: bold;
+    font-size: 13px;
+}
+
+.heatOn {
+    background: #ffedd5;
+    color: #c2410c;
+}
+
+.fanOn {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.states {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+}
+
+.state {
+    padding: 10px;
+    background: #f1f5f9;
+    border-radius: 5px;
+    font-size: 13px;
+}
+
+.active {
+    background: #bfdbfe;
+    border: 2px solid #2563eb;
+    font-weight: bold;
+}
+
+#log {
+    height: 190px;
+    overflow-y: auto;
+    background: #f8fafc;
+    padding: 10px;
+    font-size: 12px;
+    line-height: 1.6;
+    border-radius: 5px;
+}
+
+canvas {
+    width: 100%;
+    height: 220px;
+}
+
+footer {
+    text-align: center;
+    color: #64748b;
+    font-size: 12px;
+    margin-top: 15px;
+}
+
+max-width: 750px {
+    .container {
+        grid-template-columns: 1fr;
+    }
+
+    .cards {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>ВИЗУАЛИЗАЦИЯ РАБОТЫ АЭРОГРИЛЯ</h1>
+    <p>Полуформальный метод — конечный автомат S0–S8</p>
+</header>
+
+<div class="container">
+
+<!-- ПАНЕЛЬ УПРАВЛЕНИЯ -->
+
+<section class="panel">
+
+    <h3>ПАНЕЛЬ УПРАВЛЕНИЯ</h3>
+
+    <button class="secondary" id="powerBtn"
+            onclick="togglePower()">
+        Включить питание
+    </button>
+
+    <p>Температура приготовления</p>
+
+    <div class="value" id="tempValue">180 °C</div>
+
+    <input type="range" id="temperature"
+           min="80" max="220" value="180"
+           oninput="render()">
+
+    <p>Время приготовления</p>
+
+    <div class="value" id="durationValue">5 мин</div>
+
+    <input type="range" id="duration"
+           min="1" max="30" value="5"
+           oninput="render()">
+
+    
+
+    <button class="success" onclick="start()">
+        ▶ Запустить
+    </button>
+
+    <button onclick="pauseResume()">
+        Ⅱ Пауза / продолжить
+    </button>
+
+    <button class="danger" onclick="stop()">
+        ■ Остановить
+    </button>
+
+    <button class="secondary" onclick="reset()">
+        Сбросить модель
+    </button>
+
+    <button class="danger" onclick="injectError()">
+        Смоделировать ошибку
+    </button>
+
+</section>
+
+<!-- ОСНОВНАЯ ЧАСТЬ -->
+
+<main>
+
+    <div class="cards">
+
+        <div class="card">
+            СОСТОЯНИЕ
+            <strong id="stateCard">S0 — Выключен</strong>
+    </div>
+    <div class="card">
+        ТЕМПЕРАТУРА
+        <strong id="tempCard">25 °C</strong>
+    </div>
+
+    <div class="card">
+        ОСТАЛОСЬ
+        <strong id="timeCard">00:00</strong>
+    </div>
+
+</div>
+
+<!-- ВИЗУАЛИЗАЦИЯ -->
+
+<section class="panel">
+
+    <h3>ВИЗУАЛИЗАЦИЯ АЭРОГРИЛЯ</h3>
+
+    <svg viewBox="0 0 500 180" width="100%">
+
+        <rect x="50" y="25"
+              width="400" height="120"
+              rx="12"
+              fill="#94a3b8"
+              stroke="#475569"
+              stroke-width="3"/>
+
+        <rect x="75" y="45"
+              width="350" height="85"
+              rx="8"
+              fill="#1e293b"/>
+
+        <!-- НАГРЕВАТЕЛЬ -->
+
+        <g id="heatVisual" opacity="0">
+
+            <path d="
+                M150 110 Q130 80 150 60
+                M250 110 Q230 80 250 60
+                M350 110 Q330 80 350 60"
+                stroke="#fb923c"
+                stroke-width="5"
+                fill="none"/>
+
+        </g>
+
+        <!-- ВЕНТИЛЯТОР -->
+
+        <g id="fanVisual" opacity="0">
+
+            <circle cx="250" cy="90" r="25"
+                    fill="none"
+                    stroke="#93c5fd"
+                    stroke-width="3"/>
+
+            <path d="M250 65 V115 M225 90 H275"
+                  stroke="#93c5fd"
+                  stroke-width="5"/>
+
+        </g>
+
+        <text x="250" y="170"
+              text-anchor="middle"
+              fill="#334155">
+            Камера приготовления
+        </text>
+
+    </svg>
+
+    <div id="heaterStatus"
+         class="indicator">
+        НАГРЕВАТЕЛЬ: ВЫКЛ
+    </div>
+
+    <div id="fanStatus"
+         class="indicator">
+        ВЕНТИЛЯТОР: ВЫКЛ
+    </div>
+
+</section>
+
+<!-- КОНЕЧНЫЙ АВТОМАТ -->
+
+<section class="panel">
+
+    <h3>КОНЕЧНЫЙ АВТОМАТ</h3>
+
+    <div class="states" id="states"></div>
+
+</section>
+
+<!-- ГРАФИК ТЕМПЕРАТУРЫ -->
+
+<section class="panel">
+
+    <h3>ГРАФИК ТЕМПЕРАТУРЫ</h3>
+
+    <canvas id="temperatureChart"
+            width="800" height="220">
+    </canvas>
+
+</section>
+
+<!-- ЖУРНАЛ -->
+
+<section class="panel">
+
+    <h3>ЖУРНАЛ СОБЫТИЙ</h3>
+
+    <div id="log"></div>
+
+</section>
+
+</main>
+
+</div>
+
+<footer>
+Учебная симуляция. Не предназначена для управления реальным аэрогрилем.
+</footer>
+
+<script>
+
+// ======================================
+// СОСТОЯНИЯ КОНЕЧНОГО АВТОМАТА
+// ======================================
+
+const names = {
+S0: "Выключен",
+S1: "Ожидание",
+S2: "Настройка",
+S3: "Подготовка",
+S4: "Приготовление",
+S5: "Пауза",
+S6: "Завершение",
+S7: "Ошибка",
+S8: "Охлаждение"
+};
+
+// ======================================
+// ПЕРЕМЕННЫЕ
+// ======================================
+
+let state = "S0";
+
+let power = false;
+let heater = false;
+let fanOn = false;
+let error = false;
+
+let temp = 25;
+let remaining = 0;
+
+let timer = null;
+let preparation = null;
+
+let temperatureHistory = [25];
+
+// ======================================
+// ЖУРНАЛ СОБЫТИЙ
+// ======================================
+
+function log(message) {
+
+const time = new Date().toLocaleTimeString();
+
+const box = document.getElementById("log");
+
+box.innerHTML +=
+    `[${time}] ${message}
+`;
+
+box.scrollTop = box.scrollHeight;
+}
+
+// ======================================
+// ПЕРЕХОД МЕЖДУ СОСТОЯНИЯМИ
+// ======================================
+
+function setState(code, message) {
+
+state = code;
+
+log(message);
+
+render();
+}
+
+// ======================================
+// ОБНОВЛЕНИЕ ИНТЕРФЕЙСА
+// ======================================
+
+function render() {
+
+const target = Number(
+    document.getElementById("temperature").value
+);
+
+const minutes = Number(
+    document.getElementById("duration").value
+
+
+);
+
+document.getElementById("tempValue").textContent =
+    target + " °C";
+
+document.getElementById("durationValue").textContent =
+    minutes + " мин";
+
+document.getElementById("stateCard").textContent =
+    state + " — " + names[state];
+
+document.getElementById("tempCard").textContent =
+    Math.round(temp) + " °C";
+
+const m = Math.floor(remaining / 60);
+const s = remaining % 60;
+
+document.getElementById("timeCard").textContent =
+    String(m).padStart(2, "0") + ":" +
+    String(s).padStart(2, "0");
+
+document.getElementById("powerBtn").textContent =
+    power ? "Выключить питание" : "Включить питание";
+
+const heatStatus = document.getElementById("heaterStatus");
+const fanStatus = document.getElementById("fanStatus");
+
+heatStatus.textContent =
+    "НАГРЕВАТЕЛЬ: " + (heater ? "ВКЛ" : "ВЫКЛ");
+
+fanStatus.textContent =
+    "ВЕНТИЛЯТОР: " + (fanOn ? "ВКЛ" : "ВЫКЛ");
+
+heatStatus.className =
+    "indicator " + (heater ? "heatOn" : "");
+
+fanStatus.className =
+    "indicator " + (fanOn ? "fanOn" : "");
+
+document.getElementById("heatVisual").style.opacity =
+    heater ? 1 : 0;
+
+document.getElementById("fanVisual").style.opacity =
+    fanOn ? 1 : 0;
+
+// ОБНОВЛЕНИЕ КОНЕЧНОГО АВТОМАТА
+
+const statesBox = document.getElementById("states");
+
+statesBox.innerHTML = Object.entries(names).map(
+    ([code, name]) => {
+
+        return `
+            <div class="state ${code === state ? "active" : ""}">
+                ${code} — ${name}
+            </div>
+        `;
+
+    }
+).join("");
+
+drawChart();
+}
+
+// ======================================
+// ОЧИСТКА ТАЙМЕРОВ
+// ======================================
+
+function clearTimers() {
+
+clearInterval(timer);
+clearTimeout(preparation);
+
+timer = null;
+preparation = null;
+}
+
+// ======================================
+// ВКЛЮЧЕНИЕ И ВЫКЛЮЧЕНИЕ
+// ======================================
+
+function togglePower() {
+
+if (!power) {
+
+    power = true;
+    error = false;
+
+    setState(
+        "S1",
+        "Питание включено: S0 → S1."
+    );
+
+} else {
+
+    clearTimers();
+
+    power = false;
+    heater = false;
+    fanOn = false;
+    remaining = 0;
+
+    setState(
+        "S0",
+        "Питание выключено."
+    );
+}
+}
+
+// ======================================
+// ЗАПУСК ПРИГОТОВЛЕНИЯ
+// ======================================
+
+function start() {
+
+if (!power) {
+
+    alert("Сначала включите питание.");
+
+    return;
+}
+
+if (error || state === "S7") {
+
+    alert("Сначала сбросьте модель.");
+
+    return;
+}
+
+if (
+    state === "S4" ||
+    state === "S3" ||
+    state === "S8"
+) {
+    return;
+}
+
+clearTimers();
+
+setState(
+    "S2",
+    "S2: проверка заданных параметров."
+);
+
+remaining =
+    Number(document.getElementById("duration").value) * 60;
+
+setState(
+    "S3",
+    "S3: подготовка. Включение вентилятора."
+);
+
+fanOn = true;
+heater = false;
+
+render();
+
+preparation = setTimeout(
+    beginCooking,
+    1200
+);
+}
+
+// ======================================
+// НАЧАЛО ПРИГОТОВЛЕНИЯ
+// ======================================
+
+function beginCooking() {
+
+if (state !== "S3" || !power) return;
+
+setState(
+    "S4",
+    "S4: приготовление начато."
+);
+
+fanOn = true;
+
+timer = setInterval(tick, 1000);
+}
+
+// ======================================
+// ПРОЦЕСС НАГРЕВА
+// ======================================
+
+function tick() {
+
+if (state !== "S4") return;
+
+const target =
+    Number(document.getElementById("temperature").value);
+
+if (temp < target) {
+
+    temp = Math.min(target, temp + 3);
+
+} else {
+
+    temp = Math.max(target - 2, temp - 0.5);
+}
+
+heater = temp < target;
+
+temperatureHistory.push(temp);
+
+
+if (temp >= 230) {
+
+    fail("Превышена предельная температура.");
+
+    return;
+}
+
+remaining--;
+
+if (remaining <= 0) {
+
+    remaining = 0;
+
+    startCooling();
+
+    return;
+}
+
+render();
+}
+
+// ======================================
+// ОХЛАЖДЕНИЕ
+// ======================================
+
+function startCooling() {
+
+clearTimers();
+
+heater = false;
+fanOn = true;
+
+setState(
+    "S8",
+    "Нагрев отключён. Началось охлаждение."
+);
+
+if (temp <= 25) {
+
+    finishCooling();
+
+    return;
+}
+
+timer = setInterval(coolTick, 1000);
+}
+
+function coolTick() {
+
+if (state !== "S8") return;
+
+temp = Math.max(25, temp - 3);
+
+heater = false;
+fanOn = true;
+
+temperatureHistory.push(temp);
+
+if (temp <= 25) {
+
+    finishCooling();
+
+    return;
+}
+
+render();
+}
+
+function finishCooling() {
+
+clearTimers();
+
+temp = 25;
+
+heater = false;
+fanOn = false;
+
+temperatureHistory.push(temp);
+
+setState(
+    "S6",
+    "Охлаждение завершено. Температура достигла комнатной."
+);
+}
+
+// ======================================
+// ПАУЗА И ПРОДОЛЖЕНИЕ
+// ======================================
+
+function pauseResume() {
+
+if (state === "S4") {
+
+    clearTimers();
+
+    heater = false;
+    fanOn = false;
+
+    setState(
+        "S5",
+        "Приготовление приостановлено."
+    );
+
+} else if (state === "S5") {
+
+    fanOn = true;
+
+    setState(
+        "S4",
+        "Приготовление продолжено."
+    );
+
+    timer = setInterval(tick, 1000);
+
+} else if (state === "S8") {
+
+    clearTimers();
+
+    heater = false;
+    fanOn = false;
+
+    setState(
+        "S5",
+        "Охлаждение приостановлено."
+    );
+
+} else {
+
+    log("Пауза доступна во время работы.");
+}
+}
+
+// ======================================
+// ОСТАНОВКА
+// ======================================
+
+function stop() {
+
+if (state === "S5" && temp > 25) {
+    startCooling();
+    return;
+}
+
+if (temp > 25 && power) {
+
+    remaining = 0;
+
+    startCooling();
+
+} else {
+
+    clearTimers();
+
+    heater = false;
+    fanOn = false;
+    remaining = 0;
+
+    setState(
+        power ? "S1" : "S0",
+        "Работа остановлена."
+    );
+}
+}
+
+// ======================================
+// ИМИТАЦИЯ ОШИБКИ
+// ======================================
+
+function injectError() {
+
+if (!power) {
+
+    log("Сначала включите питание.");
+
+} else {
+
+    fail("Смоделирована неисправность датчика.");
+}
+}
+
+function fail(reason) {
+
+clearTimers();
+
+error = true;
+
+heater = false;
+fanOn = false;
+
+setState(
+    "S7",
+    "ОШИБКА: " + reason + " Нагрев отключён."
+);
+}
+
+// ======================================
+// СБРОС МОДЕЛИ
+// ======================================
+
+function reset() {
+
+clearTimers();
+
+error = false;
+
+heater = false;
+fanOn = false;
+
+temp = 25;
+remaining = 0;
+
+temperatureHistory = [25];
+
+setState(
+    power ? "S1" : "S0",
+    "Модель сброшена."
+);
+}
+
+// ======================================
+// ГРАФИК ТЕМПЕРАТУРЫ
+// ======================================
+
+function drawChart() {
+
+const canvas = document.getElementById("temperatureChart");
+const ctx = canvas.getContext("2d");
+
+const width = canvas.width;
+const height = canvas.height;
+
+ctx.clearRect(0, 0, width, height);
+
+const maxTemp = Math.max(
+    100,
+    ...temperatureHistory
+);
+
+// СЕТКА
+
+ctx.strokeStyle = "#e2e8f0";
+ctx.lineWidth = 1;
+
+for (let i = 0; i <= 4; i++) {
+
+    const y = 15 + i * 45;
+
+    ctx.beginPath();
+    ctx.moveTo(40, y);
+    ctx.lineTo(width - 10, y);
+    ctx.stroke();
+
+    const value = Math.round(
+        maxTemp - i * maxTemp / 4
+    );
+
+    ctx.fillStyle = "#64748b";
+
+
+ctx.font = "12px Arial";
+
+    ctx.fillText(value + "°", 3, y + 4);
+}
+
+// ГРАФИК
+
+if (temperatureHistory.length < 2) return;
+
+const data = temperatureHistory.slice(-150);
+
+ctx.beginPath();
+ctx.strokeStyle = "#2563eb";
+ctx.lineWidth = 3;
+
+data.forEach((value, index) => {
+
+    const x = 40 +
+        index * (width - 55) / Math.max(1, data.length - 1);
+
+    const y = height - 15 -
+        (value / maxTemp) * (height - 30);
+
+    if (index === 0) {
+        ctx.moveTo(x, y);
+    } else {
+        ctx.lineTo(x, y);
+    }
+});
+
+ctx.stroke();
+}
+
+// ======================================
+// ЗАПУСК ПРОГРАММЫ
+// ======================================
+
+render();
+
+log(
+"Программа запущена. Состояние S0 — устройство выключено."
+);
+
+</script>
+
+</body>
+</html>
